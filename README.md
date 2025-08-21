@@ -167,7 +167,7 @@ overlay = true
 # date&time video overlay border
 overlay_border = 2
 # Slack web hook URL
-slack_url = "https://hooks.slack.com/services/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"
+slack_url = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
 # Slack channel
 slack_channel  = "#cam"
 # Slack user
