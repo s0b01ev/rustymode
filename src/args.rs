@@ -1,5 +1,6 @@
-// bombuscv: OpenCV based motion detection/recording software built for research on bumblebees.
-// Copyright (C) 2022 Marco Radocchia
+// rustymode: Fork of bombuscv, originally an OpenCV-based motion detection/recording software built for research on bumblebees.
+// Originally developed as bombuscv by Marco Radocchia (C) 2022
+// Modified and renamed to rustymode by Dmitry Sobolev (C) 2025
 //
 // This program is free software: you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free Software
@@ -42,9 +43,9 @@ fn parse_video(video: &str) -> Result<PathBuf, String> {
 /// OpenCV motion detection/video-recording tool developed for research on Bumblebees.
 #[derive(Parser, Debug)]
 #[clap(
-    author = "Marco Radocchia <marco.radocchia@outlook.com>",
+    author = "Dmitry Sobolev <sobolev@gmail.com>, originally by Marco Radocchia <marco.radocchia@outlook.com>",
     version,
-    about,
+    about = "Fork of BombusCV: OpenCV-based motion detection/recording software for insect research.",
     long_about = None
 )]
 pub struct Args {

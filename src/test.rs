@@ -1,3 +1,26 @@
+// rustymode: Fork of bombuscv, originally an OpenCV-based motion detection/recording software built for research on bumblebees.
+// Originally developed as bombuscv by Marco Radocchia (C) 2022
+// Modified and renamed to rustymode by Dmitry Sobolev (C) 2025
+//
+// This program is free software: you can redistribute it and/or modify it under
+// the terms of the GNU General Public License as published by the Free Software
+// Foundation, either version 3 of the License, or (at your option) any later
+// version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+// details.
+//
+// You should have received a copy of the GNU General Public License along with
+// this program. If not, see https://www.gnu.org/licenses/.
+//
+//!
+//! # rustymode
+//!
+//! Motion Detection, Video Streaming and Alerting with Rust.
+
+
 use crate::{Codec, Config, Grabber, Local, MotionDetector, Path, Writer};
 use bombuscv_rs::Frame;
 use directories::BaseDirs;
@@ -23,6 +46,12 @@ fn sync_frame_processing_avg_time() {
         overlay: false,
         no_color: true,
         quiet: false,
+        overlay_border: 2,
+        slack_url: "".to_string(),
+        slack_channel: "#cam".to_string(),
+        slack_user: "detector".to_string(),
+        streamer_image_encode: ".jpeg".to_string(),
+        streamer_listener: "127.0.0.1:8740".to_string(),
     };
 
     // Format video file path as <config.directory/date&time>.
@@ -67,6 +96,7 @@ fn sync_frame_processing_avg_time() {
         grabber.get_fps(),
         grabber.get_size(),
         config.overlay,
+        config.overlay_border,
     )
     .unwrap();
 

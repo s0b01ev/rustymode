@@ -1,5 +1,6 @@
-// bombuscv: OpenCV based motion detection/recording software built for research on bumblebees.
-// Copyright (C) 2022 Marco Radocchia
+// rustymode: Fork of bombuscv, originally an OpenCV-based motion detection/recording software built for research on bumblebees.
+// Originally developed as bombuscv by Marco Radocchia (C) 2022
+// Modified and renamed to rustymode by Dmitry Sobolev (C) 2025
 //
 // This program is free software: you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free Software
@@ -73,6 +74,7 @@ fn default_framerate() -> u8 {
     60
 }
 
+
 /// Default output video directory.
 fn default_directory() -> PathBuf {
     // No base directories could be determined, so panicking is fine here.
@@ -90,6 +92,26 @@ fn default_format() -> String {
 /// Default value for Date&Time overlay border.
 fn default_overlay_border() -> u8 {
     3
+}
+
+/// Default value for Slack Channel.
+fn default_slack_channel() -> String  {
+    "#cam".to_string()
+}
+
+/// Default value for Slack User.
+fn default_slack_user() -> String  {
+    "detector".to_string()
+}
+
+/// Default value for streamer listener
+fn default_streamer_listener() -> String {
+    "0.0.0.0:8740".to_string()
+}
+
+/// Default value for streamer encode image type
+fn default_streamer_encode_image() -> String {
+    ".jpg".to_string()
 }
 
 /// Configuration options.
@@ -142,6 +164,26 @@ pub struct Config {
     /// Mute standard output.
     #[serde(default)]
     pub quiet: bool,
+
+    /// Slack wbehook url.
+    #[serde(default)]
+    pub slack_url: String,
+
+    /// Slack channel.
+    #[serde(default)]
+    pub slack_channel: String,
+
+    /// Slack username.
+    #[serde(default)]
+    pub slack_user: String,
+
+    /// Streamer listening apddress
+    #[serde(default)]
+    pub streamer_listener: String,
+    
+    /// Streamer image encode type
+    #[serde(default)]
+    pub streamer_image_encode: String,
 }
 
 /// Implement the Default trait for Config.
@@ -160,6 +202,11 @@ impl Default for Config {
             overlay_border: default_overlay_border(),
             no_color: false,
             quiet: false,
+            slack_url: "".to_string(),
+            slack_channel: default_slack_channel(),
+            slack_user: default_slack_user(),
+            streamer_image_encode: default_streamer_encode_image(),
+            streamer_listener: default_streamer_listener(),
         }
     }
 }
@@ -168,15 +215,15 @@ impl Config {
     /// Parse configuration from config file, return Err on error.
     pub fn parse() -> Result<Self, ErrorKind> {
         if let Some(base_dirs) = BaseDirs::new() {
-            // Fetch the environment variables for BOMBUSCV_CONFIG to hold a custom path to store
+            // Fetch the environment variables for RUSTYMODE_CONFIG to hold a custom path to store
             // the configuration file.
-            let config_file = if let Ok(path) = env::var("BOMBUSCV_CONFIG") {
+            let config_file = if let Ok(path) = env::var("RUSTYMODE_CONFIG") {
                 expand_home(Path::new(&path))
             } else {
-                // XDG base spec directories: ~/.config/bomsucv/config.toml
+                // XDG base spec directories: ~/.config/rustymode/config.toml
                 base_dirs
                     .config_dir()
-                    .join(Path::new("bombuscv/config.toml"))
+                    .join(Path::new("rustymode/config.toml"))
             };
 
             // On Err variant, return empty string (=> default config).
