@@ -100,8 +100,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/s0b01ev/r
 
 ```
 rustymode 0.3.0
-Marco Radocchia <marco.radocchia@outlook.com>
-OpenCV based motion detection/recording/streaming software with alerting support
+Dmitry Sobolev <sobolev@gmail.com>, originally by Marco Radocchia <marco.radocchia@outlook.com>
+Fork of BombusCV: OpenCV-based motion detection/recording software for insect research.
 
 USAGE:
     rustymode [OPTIONS]
