@@ -1,11 +1,25 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 authors:
+- family-names: "Sobolev"
+  given-names: "Dmitry"
 - family-names: "Radocchia"
   given-names: "Marco"
 - family-names: "Di Francescantonio"
   given-names: "Gaia"
-title: "BombusCV"
-version: 0.3.0
-date-released: 2022-06-28
+title: "RustyMoDe: A fork of BombusCV"
+version: 0.1.0
+date-released: 2025-08-21
 url: "https://github.com/marcoradocchia/bombuscv-rs"
+
+references:
+  - type: software
+    authors:
+      - family-names: "Radocchia"
+        given-names: "Marco"
+      - family-names: "Di Francescantonio"
+        given-names: "Gaia"
+    title: "BombusCV"
+    version: "0.3.0"
+    date-released: 2022-06-28
+    url: "https://github.com/marcoradocchia/bombuscv-rs"

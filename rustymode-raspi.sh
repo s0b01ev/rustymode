@@ -44,9 +44,9 @@ ask_reboot()
 
 greet ()
 {
-  printf "$CYAN\n#######################################################\n"
-  printf        "## Congratulations! BombusCV successfully installed! ##\n"
-  printf        "#######################################################\n$NORM"
+  printf "$CYAN\n##############################################################\n"
+  printf        "## Congratulations! Motion Detector successfully installed! ##\n"
+  printf        "###############################################################\n$NORM"
 }
 
 # Print error message and exit.
@@ -58,18 +58,11 @@ exit_msg()
 
 welcome_msg()
 {
-  printf "$YELLOW██████╗  ██████╗ ███╗   ███╗██████╗ ██╗   ██╗███████╗ ██████╗██╗   ██╗\n"
-  printf        "██╔══██╗██╔═══██╗████╗ ████║██╔══██╗██║   ██║██╔════╝██╔════╝██║   ██║\n"
-  printf   "$NORM██████╔╝██║   ██║██╔████╔██║██████╔╝██║   ██║███████╗██║     ██║   ██║\n"
-  printf        "██╔══██╗██║   ██║██║╚██╔╝██║██╔══██╗██║   ██║╚════██║██║     ╚██╗ ██╔╝\n"
-  printf "$YELLOW██████╔╝╚██████╔╝██║ ╚═╝ ██║██████╔╝╚██████╔╝███████║╚██████╗ ╚████╔╝ \n"
-  printf        "╚═════╝  ╚═════╝ ╚═╝     ╚═╝╚═════╝  ╚═════╝ ╚══════╝ ╚═════╝  ╚═══╝  \n\n$NORM"
-
   printf "$CYAN#####################################################################\n"
   printf      "## Installation helper script for bombuscv-rs (by Marco Radocchia) ##\n"
   printf      "## Warning: the installation process may take a while (>1h)...     ##\n"
   printf      "#####################################################################\n\n$NORM"
-}
+}  
 
 [ $USER = root ] && exit_msg "please don't run the script as root, run as normal user"
 
@@ -134,6 +127,7 @@ sudo apt-get install -y \
   libclang-dev \
   build-essential \
   cmake \
+  llvm \
   git \
   ffmpeg \
   unzip \
@@ -164,23 +158,23 @@ sudo apt-get install -y \
   libgflags-dev \
   protobuf-compiler
 
-# Download OpenCV 4.6.0.
-wget -O opencv.zip https://github.com/opencv/opencv/archive/4.6.0.zip
-wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/4.6.0.zip
+# Download OpenCV 4.9.0.
+wget -O opencv.zip https://github.com/opencv/opencv/archive/4.9.0.zip
+wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/4.9.0.zip
 # unzip downloaded files
 unzip opencv.zip
 unzip opencv_contrib.zip
 # rename directories for convenience
-mv opencv-4.6.0 opencv
-mv opencv_contrib-4.6.0 opencv_contrib
+mv opencv-4.9.0 opencv
+mv opencv_contrib-4.9.0 opencv_contrib
 # remove the zip files
 rm opencv.zip
 rm opencv_contrib.zip
 # create the build directory
 cd opencv && mkdir build && cd build
 
-# Compile OpenCV 4.6.0.
-printf "$GREEN==> Compiling OpenCV v4.6.0...$NORM\n"
+# Compile OpenCV 4.9.0.
+printf "$GREEN==> Compiling OpenCV v4.9.0...$NORM\n"
 # run cmake
 cmake -DCMAKE_BUILD_TYPE=RELEASE \
 -DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -226,8 +220,8 @@ cmake -DCMAKE_BUILD_TYPE=RELEASE \
 # Run make (compile) using all 4 cores.
 make -j4
 
-# Install OpenCV 4.6.0
-printf "$GREEN==> Installing OpenCV v4.6.0...$NORM\n"
+# Install OpenCV 4.9.0
+printf "$GREEN==> Installing OpenCV v4.9.0...$NORM\n"
 sudo make install
 sudo ldconfig
 
@@ -249,7 +243,7 @@ command -v cargo > /dev/null || {
 command -v cargo > /dev/null
 if [ $? = 0 ]; then 
   printf "$GREEN==> Installing bombuscv-rs...$NORM\n"
-  $HOME/.cargo/bin/cargo install bombuscv-rs
+  $HOME/.cargo/bin/cargo install --path ./motion-detector
 else
   exit_msg "unable to install rustup, please retry"
 fi

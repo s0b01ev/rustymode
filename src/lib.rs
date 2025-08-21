@@ -1,5 +1,6 @@
-// bombuscv: OpenCV based motion detection/recording software built for research on bumblebees.
-// Copyright (C) 2022 Marco Radocchia
+// rustymode: Fork of bombuscv, originally an OpenCV-based motion detection/recording software built for research on bumblebees.
+// Originally developed as bombuscv by Marco Radocchia (C) 2022
+// Modified and renamed to rustymode by Dmitry Sobolev (C) 2025
 //
 // This program is free software: you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free Software
@@ -15,15 +16,16 @@
 // this program. If not, see https://www.gnu.org/licenses/.
 //
 //!
-//! # BombusCV
+//! # rustymode
 //!
-//! Motion detection & video recording software based on **OpenCV**, built for research on
-//! **Bumblebees** (hence the name).
+//! Motion Detection, Video Streaming and Alerting with Rust.
+//!
 
 pub mod args;
 pub mod color;
 pub mod config;
 pub mod error;
+pub mod slack;
 
 use crate::error::ErrorKind;
 use chrono::{DateTime, Local};
@@ -37,11 +39,16 @@ use opencv::{
     prelude::{Mat, MatTraitConst},
     videoio::{
         VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst, VideoWriter, VideoWriterTrait,
-        CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L2,
+        CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L2, CAP_ANY,
     },
+    highgui,
 };
-// use opencv::highgui;
+
 use std::{os::raw::c_char, path::Path};
+use std::io;
+use std::net::{SocketAddr, TcpListener};
+use slack_hook::{Payload, PayloadBuilder, Slack};
+use url::Url;
 
 /// Video codecs.
 #[derive(Debug)]
@@ -58,16 +65,16 @@ impl Codec {
         // If no fourcc code can be obtained, video processing can't start, so it's fine to panic.
         match *self {
             Codec::MJPG => {
-                VideoWriter::fourcc('M' as c_char, 'J' as c_char, 'P' as c_char, 'G' as c_char)
+                VideoWriter::fourcc('M' as char, 'J' as char, 'P' as char, 'G' as char)
             }
             Codec::XVID => {
-                VideoWriter::fourcc('X' as c_char, 'V' as c_char, 'I' as c_char, 'D' as c_char)
+                VideoWriter::fourcc('X' as char, 'V' as char, 'I' as char, 'D' as char)
             }
             Codec::MP4V => {
-                VideoWriter::fourcc('m' as c_char, 'p' as c_char, '4' as c_char, 'v' as c_char)
+                VideoWriter::fourcc('m' as char, 'p' as char, '4' as char, 'v' as char)
             }
             Codec::H264 => {
-                VideoWriter::fourcc('h' as c_char, '2' as c_char, '6' as c_char, '4' as c_char)
+                VideoWriter::fourcc('h' as char, '2' as char, '6' as char, '4' as char)
             }
         }
         .unwrap_or_else(|_| panic!("unable to generate {:?} fourcc code", self))
@@ -120,7 +127,8 @@ impl Grabber {
         ]);
 
         // Construct the VideoCapture object.
-        match VideoCapture::new_with_params(index, CAP_V4L2, &params) {
+        match VideoCapture::new_with_params(index, CAP_ANY, &params) {
+        //match VideoCapture::new_with_params(index, CAP_V4L2, &params) {
             Ok(cap) => Ok(Self { cap }),
             Err(_) => Err(ErrorKind::InvalidCameraIndex),
         }
@@ -177,6 +185,7 @@ impl Grabber {
             Err(ErrorKind::FrameDropped)
         }
     }
+
 }
 
 /// Implement Drop trait for the Grabber struct to release the VideoCapture on Grabber drop.
@@ -410,4 +419,63 @@ impl Drop for Writer {
             .release()
             .expect("unable to release VideoWriter");
     }
+}
+
+/// Video streamer
+///
+/// # Fields
+/// * grabber: frame grabber
+/// * listener: tcp listener for streaming server
+/// * imencode_ext: file extension that defines the output format. Must include a leading period
+pub struct VideoStreamer {
+    // pub grabber: Grabber,
+    pub listener: TcpListener,
+    imencode_ext: String,
+}
+
+impl VideoStreamer {
+    /// Create an instance of the  video streamer from a camera input.
+    ///
+    /// # Parameters
+    /// * index: _/dev/video<index>_ capture camera index
+    /// * height: video capture desired frame height
+    /// * width: video capture desired frame width
+    /// * fps: video capture desired framerate
+    /// * listener_addr: video streaming listening addr:port
+    /// * encode_image_type: image type to encode video to
+    ///
+    /// # Note
+    ///
+    /// Wherever the requested video capture parameters (height, width, fps) are not available for
+    /// the given video capture device, OpenCV selects the closest available values.
+    pub fn new(index: i32, height: i32, width: i32, fps: i32, listener_addr: &str, encode_image_type: &str) -> Result<Self, ErrorKind> {
+        // Generate Vector of VideoCapture parameters.
+        let params = Vector::from_slice(&[
+            CAP_PROP_FRAME_WIDTH,
+            width,
+            CAP_PROP_FRAME_HEIGHT,
+            height,
+            CAP_PROP_FPS,
+            fps,
+        ]);
+
+        match TcpListener::bind(listener_addr) {
+            Ok(listener) => {
+                    //match VideoCapture::new_with_params(index, CAP_V4L2, &params) {
+                        Ok(Self {
+                            listener,
+                            imencode_ext: encode_image_type.to_string() })
+            },
+            Err(err) => Err(ErrorKind::CreateSocketError(err.to_string())),
+        }
+
+    }
+
+}
+
+/// Messanger
+///
+pub trait Messenger {
+    fn send(&mut self, payload: Payload) -> Result<(), ErrorKind>;
+    fn payload(&self, text: String) -> Result<Payload, ErrorKind>;
 }

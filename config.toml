@@ -1,0 +1,32 @@
+# be quiet (mute stdout)
+quiet = false
+# output video directory
+directory = "~/"
+# output video filename format (see
+# https://docs.rs/chrono/latest/chrono/format/strftime/index.html for valid specifiers)
+format = "%Y-%m-%dT%H:%M:%S"
+
+# The following options are ignored if bombuscv is run with `--video` option
+# /dev/video<index> camera input
+index = 0
+# video capture frame width
+width = 640
+# video capture frame height
+height = 480
+# video capture framerate
+framerate = 30
+# date&time video overlay
+overlay = true
+# date&time video overlay border
+overlay_border = 2
+# Slack web hook URL
+slack_url = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+# Slack channel
+slack_channel  = "#cam"
+# Slack user
+slack_user = "detector"
+# Streamer listener
+streamer_listener = "0.0.0.0:8740"
+# Streamer encoder image type
+streamer_image_encode = ".jpg"
+

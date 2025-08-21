@@ -1,5 +1,6 @@
-// bombuscv: OpenCV based motion detection/recording software built for research on bumblebees.
-// Copyright (C) 2022 Marco Radocchia
+// rustymode: Fork of bombuscv, originally an OpenCV-based motion detection/recording software built for research on bumblebees.
+// Originally developed as bombuscv by Marco Radocchia (C) 2022
+// Modified and renamed to rustymode by Dmitry Sobolev (C) 2025
 //
 // This program is free software: you can redistribute it and/or modify it under
 // the terms of the GNU General Public License as published by the Free Software
@@ -15,6 +16,10 @@
 // this program. If not, see https://www.gnu.org/licenses/.
 
 use std::fmt::{self, Display, Formatter};
+
+use std::error::Error;
+use std::boxed::Box;
+
 
 /// BombusCV error kinds.
 #[derive(Debug)]
@@ -35,6 +40,14 @@ pub enum ErrorKind {
     EmptyFrame,
     /// Occurs when VideoWriter fails to print text overlay on video frame.
     TextOverlayErr,
+    /// Occurs when unable to create a listening socket for VideoStreamer
+    CreateSocketError(String),
+    /// Occurs when unable to create Slack client for Messenger
+    CreateSlackClientErr(String),
+    /// Occurs when unable to create Slack payload
+    CreateSlackPayloadErr,
+    /// Occurs when unable to send Slack message
+    UnableToSendSlackMessage(String),
 }
 
 impl Display for ErrorKind {
@@ -49,8 +62,14 @@ impl Display for ErrorKind {
             Self::FrameDropped => None,
             Self::EmptyFrame => Some("empty video frame".to_string()),
             Self::TextOverlayErr => Some("unable to print text overlay".to_string()),
+            Self::CreateSocketError(msg) => Some(msg.to_string()),
+            Self::CreateSlackClientErr(msg) => Some(msg.to_string()),
+            Self::CreateSlackPayloadErr => Some("unable to create Slack payload".to_string()),
+            Self::UnableToSendSlackMessage(msg) => Some(msg.to_string()),
         }
         .unwrap_or_default()
         .fmt(f)
     }
 }
+
+impl Error for ErrorKind {}
