@@ -19,12 +19,11 @@ framerate = 30
 overlay = true
 # date&time video overlay border
 overlay_border = 2
-# Slack web hook URL
-slack_url = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
-# Slack channel
-slack_channel  = "#cam"
-# Slack user
-slack_user = "detector"
+# Slack channel ID
+slack_channel_id = "C06KDAZ3EBE"
+# TODO: move to env variable
+# Slack token
+slack_token = ""
 # Streamer listener
 streamer_listener = "0.0.0.0:8740"
 # Streamer encoder image type

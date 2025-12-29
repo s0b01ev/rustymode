@@ -47,8 +47,10 @@ use opencv::{
 use std::{os::raw::c_char, path::Path};
 use std::io;
 use std::net::{SocketAddr, TcpListener};
+use image::DynamicImage;
 use slack_hook::{Payload, PayloadBuilder, Slack};
 use url::Url;
+use async_trait::async_trait;
 
 /// Video codecs.
 #[derive(Debug)]
@@ -86,7 +88,7 @@ impl Codec {
 /// # Fields
 /// * frame: the video frame itself
 /// * datetime: DateTime object representing the instant
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub frame: Mat,
     pub datetime: DateTime<Local>,
@@ -473,9 +475,26 @@ impl VideoStreamer {
 
 }
 
-/// Messanger
+/// Messenger
 ///
-pub trait Messenger {
-    fn send(&mut self, payload: Payload) -> Result<(), ErrorKind>;
-    fn payload(&self, text: String) -> Result<Payload, ErrorKind>;
+#[derive(Debug, Clone)]
+pub enum ChatPayload {
+    Text {
+        text: String,
+    },
+    TextWithEmoji {
+        text: String,
+        emoji: String,
+    },
+    Image {
+        // url: String,
+        // alt_text: Option<String>,
+        img: Vec<u8>
+    },
+}
+
+
+#[async_trait]
+pub trait Messenger: Send + Sync {
+    async fn send(&self, payload: &ChatPayload) -> anyhow::Result<()>;
 }

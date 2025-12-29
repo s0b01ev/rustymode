@@ -22,7 +22,7 @@
 
 
 use crate::{Codec, Config, Grabber, Local, MotionDetector, Path, Writer};
-use bombuscv_rs::Frame;
+use rustymode::Frame;
 use directories::BaseDirs;
 use std::{fs, time::Instant};
 
@@ -47,9 +47,8 @@ fn sync_frame_processing_avg_time() {
         no_color: true,
         quiet: false,
         overlay_border: 2,
-        slack_url: "".to_string(),
-        slack_channel: "#cam".to_string(),
-        slack_user: "detector".to_string(),
+        slack_channel_id: "".to_string(),
+        slack_token: "".to_string(),
         streamer_image_encode: ".jpeg".to_string(),
         streamer_listener: "127.0.0.1:8740".to_string(),
     };
