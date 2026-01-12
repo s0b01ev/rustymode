@@ -45,12 +45,14 @@ use opencv::{
 };
 
 use std::{os::raw::c_char, path::Path};
+use std::arch::aarch64::float64x1_t;
 use std::io;
 use std::net::{SocketAddr, TcpListener};
 use image::DynamicImage;
 use slack_hook::{Payload, PayloadBuilder, Slack};
 use url::Url;
 use async_trait::async_trait;
+use opencv::imgproc::contour_area;
 
 /// Video codecs.
 #[derive(Debug)]
@@ -316,14 +318,31 @@ impl MotionDetector {
         )
         .expect("find_contours failed");
 
+
         // Count contours in the processed frame.
         Ok(match contours.is_empty() {
             // No motion was detected.
             true => None,
             // Motion was found, return original video frame.
-            false => Some(frame),
+            false => {
+                if max_countours_area(contours) > 10000.0 {
+                    Some(frame)
+                } else { None }
+            },
         })
     }
+}
+
+fn max_countours_area(contours: Vector<Vector<Point>>) -> f64 {
+   let mut max_area = 0f64;
+   contours.iter().for_each(
+       |contour| {
+           if let Ok(area) = contour_area(&contour, false) {
+               max_area = max_area.max(area);
+           }
+       }
+   );
+   max_area
 }
 
 /// Video frame writer.
