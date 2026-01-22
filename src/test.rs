@@ -51,6 +51,7 @@ fn sync_frame_processing_avg_time() {
         slack_token: "".to_string(),
         streamer_image_encode: ".jpeg".to_string(),
         streamer_listener: "127.0.0.1:8740".to_string(),
+        sensitivity: 10000.0,
     };
 
     // Format video file path as <config.directory/date&time>.
@@ -86,7 +87,7 @@ fn sync_frame_processing_avg_time() {
     .unwrap();
 
     // Instance of the motion detector.
-    let mut detector = MotionDetector::new();
+    let mut detector = MotionDetector::new(10000.0);
 
     // Instance of the frame writer.
     let mut writer = Writer::new(

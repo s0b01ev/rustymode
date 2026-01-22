@@ -44,13 +44,8 @@ use opencv::{
     highgui,
 };
 
-use std::{os::raw::c_char, path::Path};
-use std::arch::aarch64::float64x1_t;
-use std::io;
-use std::net::{SocketAddr, TcpListener};
-use image::DynamicImage;
-use slack_hook::{Payload, PayloadBuilder, Slack};
-use url::Url;
+use std::{path::Path};
+use std::net::{TcpListener};
 use async_trait::async_trait;
 use opencv::imgproc::contour_area;
 
@@ -206,22 +201,24 @@ impl Drop for Grabber {
 #[derive(Debug)]
 pub struct MotionDetector {
     prev_frame: Mat,
+    sensitivity: f64,
 }
 
 impl Default for MotionDetector {
     fn default() -> Self {
-        Self::new()
+        Self::new(10000.0)
     }
 }
 
 impl MotionDetector {
     /// Create an instance of the MotionDetector.
-    pub fn new() -> Self {
+    pub fn new(sensitivity: f64) -> Self {
         Self {
             // Initialize prev_frame as 640x480 empty frame: next grabbed frames will be
             // downscaled to this resolution and this initialization must be a valid Size for the
             // first frame comparison.
             prev_frame: unsafe { Mat::new_size(Size::new(640, 480), CV_8UC3).unwrap() },
+            sensitivity,
         }
     }
 
@@ -325,7 +322,7 @@ impl MotionDetector {
             true => None,
             // Motion was found, return original video frame.
             false => {
-                if max_countours_area(contours) > 10000.0 {
+                if max_contours_area(contours) > self.sensitivity {
                     Some(frame)
                 } else { None }
             },
@@ -333,7 +330,7 @@ impl MotionDetector {
     }
 }
 
-fn max_countours_area(contours: Vector<Vector<Point>>) -> f64 {
+fn max_contours_area(contours: Vector<Vector<Point>>) -> f64 {
    let mut max_area = 0f64;
    contours.iter().for_each(
        |contour| {
@@ -385,7 +382,7 @@ impl Writer {
         }
     }
 
-    /// Write passed frame to the video file.
+    /// Write the passed frame to the video file.
     pub fn write(&mut self, mut frame: Frame) -> Result<(), ErrorKind> {
         // Add date&time overlay.
         if self.overlay {

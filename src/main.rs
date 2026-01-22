@@ -31,14 +31,10 @@ use std::{
     },
     thread,
 };
-use std::io::{Cursor, Write};
-use std::net::TcpListener;
-use std::os::unix::raw::time_t;
+use std::io::{Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use image::{ImageFormat, ImageReader};
-use opencv::core::{Mat, Vector};
+use opencv::core::{Vector};
 use opencv::imgcodecs;
-use opencv::videoio::{CAP_ANY, VideoCapture, VideoCaptureTrait};
 use slack_morphism::prelude::*;
 
 use crate::slack::SlackMessenger;
@@ -125,7 +121,7 @@ fn main() -> io::Result<()> {
     }
 
     // Instance of the motion detector.
-    let detector = MotionDetector::new();
+    let detector = MotionDetector::new(config.sensitivity);
 
     // Instance of the frame writer.
     let writer = match Writer::new(
@@ -400,13 +396,13 @@ fn run(
     });
 
     // Spawn messenger thread:
-    // this thread receives a message from detector thread, if motion detected
+    // this thread receives a message from the detector thread, if motion detected
     let messenger_handle = thread::spawn(move || -> io::Result<()> {
         // Loop over received frames from the motion detector.
         for detected in msgr_rx {
             let mut buf = Vector::new();
-            // TODO: check result
-            let _ = imgcodecs::imencode(".png", &detected.frame, &mut buf, &Vector::new());
+            imgcodecs::imencode(".png", &detected.frame, &mut buf, &Vector::new())
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             if term_messenger.load(Ordering::Relaxed) {
                 println!("Exit 0 from messenger thread");
                 return Ok(());
@@ -420,9 +416,8 @@ fn run(
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()?;
-
-                // TODO: unwrap must die
-                rt.block_on(messenger.send(&chat_payload)).unwrap();
+                let res: anyhow::Result<()> = rt.block_on(messenger.send(&chat_payload));
+                res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             }
         }
 

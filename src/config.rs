@@ -151,6 +151,10 @@ pub struct Config {
     #[serde(skip_deserializing, default)]
     pub no_color: bool,
 
+    /// Motion detector sensitivity
+    #[serde(default)]
+    pub sensitivity: f64,
+
     /// Mute standard output.
     #[serde(default)]
     pub quiet: bool,
@@ -192,6 +196,7 @@ impl Default for Config {
             slack_token: "".to_string(),
             streamer_image_encode: default_streamer_encode_image(),
             streamer_listener: default_streamer_listener(),
+            sensitivity: 10000.0,
         }
     }
 }
