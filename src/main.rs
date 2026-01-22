@@ -340,10 +340,12 @@ fn run(
                             return Ok(());
                         }
                         buf.clear();
-                        let _ = imgcodecs::imencode(".jpg", &frame.frame, &mut buf, &Vector::new());
+                        let _ = imgcodecs::imencode(&*streamer.imencode_ext, &frame.frame, &mut buf, &Vector::new());
 
+                        let imencode_ext_trim  = &*streamer.imencode_ext.trim_start_matches('.');
                         let image_data = format!(
-                            "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
+                            "--frame\r\nContent-Type: image/{}\r\nContent-Length: {}\r\n\r\n",
+                            imencode_ext_trim,
                             buf.len()
                         );
 

@@ -448,7 +448,7 @@ impl Drop for Writer {
 pub struct VideoStreamer {
     // pub grabber: Grabber,
     pub listener: TcpListener,
-    imencode_ext: String,
+    pub imencode_ext: String,
 }
 
 impl VideoStreamer {
