@@ -30,7 +30,7 @@ pub mod slack;
 use crate::error::ErrorKind;
 use chrono::{DateTime, Local};
 use opencv::{
-    core::{absdiff, Point, Scalar, Size, Vector, BORDER_CONSTANT, BORDER_DEFAULT, CV_8UC3},
+    core::{absdiff, Point, Scalar, Size, Vector, BORDER_CONSTANT, BORDER_DEFAULT, CV_8UC3, AlgorithmHint},
     imgproc::{
         cvt_color, dilate, find_contours, gaussian_blur, morphology_default_border_value, put_text,
         resize, threshold, LineTypes, CHAIN_APPROX_SIMPLE, COLOR_BGR2GRAY, FONT_HERSHEY_DUPLEX,
@@ -269,6 +269,8 @@ impl MotionDetector {
             &mut frame_two,
             COLOR_BGR2GRAY, // Color space conversion code (see #ColorConversionCodes).
             0, // Number of channels in the destination image; if the parameter is 0, the number of the channels is derived automatically from src and code.
+            AlgorithmHint::ALGO_HINT_DEFAULT
+
         )
         .expect("cvt_color failed");
 
@@ -280,6 +282,7 @@ impl MotionDetector {
             21.,             // Gaussian kernel standard deviation in x direction.
             21.,             // Gaussian kernel standard deviation in y direction.
             BORDER_DEFAULT,
+            AlgorithmHint::ALGO_HINT_DEFAULT
         )
         .expect("gaussian_blur failed");
 

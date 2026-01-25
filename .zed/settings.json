@@ -1,0 +1,11 @@
+{
+  "lsp": {
+    "rust-analyzer": {
+      "binary": {
+        "env": {
+          "RUSTYMODE_CONFIG": "/Users/sobodmi/git/rustymode/config.toml"
+        }
+      }
+    }
+  }
+}
