@@ -9,6 +9,8 @@ GREEN="\e[1;32m"
 CYAN="\e[1;36m"
 NORM="\e[0m"
 
+APP_HOME=$HOME/rustymode
+
 # Swap file path on RaspberryPi OS.
 SWAP_FILE=/etc/dphys-swapfile
 
@@ -178,7 +180,7 @@ printf "$GREEN==> Compiling OpenCV v4.13.0...$NORM\n"
 # run cmake
 cmake -DCMAKE_BUILD_TYPE=RELEASE \
 -DCMAKE_INSTALL_PREFIX=/usr/local \
--DOPENCV_EXTRA_MODULES_PATH=$HOME/opencv_contrib/modules \
+-DOPENCV_EXTRA_MODULES_PATH=$APP_HOME/opencv_contrib/modules \
 -DCPU_BASELINE=NEON \
 -DENABLE_NEON=ON \
 -DWITH_OPENMP=ON \
@@ -225,8 +227,8 @@ printf "$GREEN==> Installing OpenCV v4.13.0...$NORM\n"
 sudo make install
 sudo ldconfig
 
-# changing cwd back to $HOME
-cd $HOME
+# changing cwd back to $APP_HOME
+cd $APP_HOME
 
 # Remove opencv source directories.
 printf "$GREEN==> Removing OpenCV files...$NORM\n"
@@ -239,11 +241,11 @@ command -v cargo > /dev/null || {
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 }
 
-# Cargo install bombuscv-rs if rustup successfully installed cargo.
+# Cargo install rustymode if rustup successfully installed cargo.
 command -v cargo > /dev/null
 if [ $? = 0 ]; then
-  printf "$GREEN==> Installing bombuscv-rs...$NORM\n"
-  $HOME/.cargo/bin/cargo install --path ./motion-detector
+  printf "$GREEN==> Installing rustymode...$NORM\n"
+  $HOME/.cargo/bin/cargo install --path $HOME/rustymode
 else
   exit_msg "unable to install rustup, please retry"
 fi
