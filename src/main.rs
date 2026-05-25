@@ -414,10 +414,13 @@ fn run(
             if time_now - message_last_sent > Duration::from_secs(5) {
                 message_last_sent = time_now;
                 Colorizer::new(MsgType::Info, no_color, "==>", motion_detected_msg.clone()).print()?;
+                let chat_message = ChatPayload::Text { text: motion_detected_msg.clone() };
                 let chat_payload = ChatPayload::Image { img: buf.into() };
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()?;
+                let res: anyhow::Result<()> = rt.block_on(messenger.send(&chat_message));
+                res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
                 let res: anyhow::Result<()> = rt.block_on(messenger.send(&chat_payload));
                 res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             }
