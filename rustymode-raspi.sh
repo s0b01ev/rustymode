@@ -9,6 +9,8 @@ GREEN="\e[1;32m"
 CYAN="\e[1;36m"
 NORM="\e[0m"
 
+APP_HOME=$HOME/rustymode
+
 # Swap file path on RaspberryPi OS.
 SWAP_FILE=/etc/dphys-swapfile
 
@@ -16,7 +18,7 @@ do_print_welcome=true
 do_update=true
 do_ask_reboot=true
 
-usage() 
+usage()
 {
   printf "Usage: $0 [OPTIONS]\n\n"
   printf "OPTIONS:\n"
@@ -26,7 +28,7 @@ usage()
   printf "  -r  Prevent script from asking for reboot\n"
 }
 
-ask_reboot() 
+ask_reboot()
 {
   printf $GREEN"Please reboot your system before continung. Reboot now? [N/y]\n"
   printf $GREEN"==> "$NORM
@@ -62,7 +64,7 @@ welcome_msg()
   printf      "## Installation helper script for bombuscv-rs (by Marco Radocchia) ##\n"
   printf      "## Warning: the installation process may take a while (>1h)...     ##\n"
   printf      "#####################################################################\n\n$NORM"
-}  
+}
 
 [ $USER = root ] && exit_msg "please don't run the script as root, run as normal user"
 
@@ -158,27 +160,27 @@ sudo apt-get install -y \
   libgflags-dev \
   protobuf-compiler
 
-# Download OpenCV 4.9.0.
-wget -O opencv.zip https://github.com/opencv/opencv/archive/4.9.0.zip
-wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/4.9.0.zip
+# Download OpenCV 4.13.0.
+wget -O opencv.zip https://github.com/opencv/opencv/archive/4.13.0.zip
+wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/4.13.0.zip
 # unzip downloaded files
 unzip opencv.zip
 unzip opencv_contrib.zip
 # rename directories for convenience
-mv opencv-4.9.0 opencv
-mv opencv_contrib-4.9.0 opencv_contrib
+mv opencv-4.13.0 opencv
+mv opencv_contrib-4.13.0 opencv_contrib
 # remove the zip files
 rm opencv.zip
 rm opencv_contrib.zip
 # create the build directory
 cd opencv && mkdir build && cd build
 
-# Compile OpenCV 4.9.0.
-printf "$GREEN==> Compiling OpenCV v4.9.0...$NORM\n"
+# Compile OpenCV 4.13.0.
+printf "$GREEN==> Compiling OpenCV v4.13.0...$NORM\n"
 # run cmake
 cmake -DCMAKE_BUILD_TYPE=RELEASE \
 -DCMAKE_INSTALL_PREFIX=/usr/local \
--DOPENCV_EXTRA_MODULES_PATH=$HOME/opencv_contrib/modules \
+-DOPENCV_EXTRA_MODULES_PATH=$APP_HOME/opencv_contrib/modules \
 -DCPU_BASELINE=NEON \
 -DENABLE_NEON=ON \
 -DWITH_OPENMP=ON \
@@ -220,13 +222,13 @@ cmake -DCMAKE_BUILD_TYPE=RELEASE \
 # Run make (compile) using all 4 cores.
 make -j4
 
-# Install OpenCV 4.9.0
-printf "$GREEN==> Installing OpenCV v4.9.0...$NORM\n"
+# Install OpenCV 4.13.0
+printf "$GREEN==> Installing OpenCV v4.13.0...$NORM\n"
 sudo make install
 sudo ldconfig
 
-# changing cwd back to $HOME 
-cd $HOME
+# changing cwd back to $APP_HOME
+cd $APP_HOME
 
 # Remove opencv source directories.
 printf "$GREEN==> Removing OpenCV files...$NORM\n"
@@ -239,11 +241,11 @@ command -v cargo > /dev/null || {
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 }
 
-# Cargo install bombuscv-rs if rustup successfully installed cargo.
+# Cargo install rustymode if rustup successfully installed cargo.
 command -v cargo > /dev/null
-if [ $? = 0 ]; then 
-  printf "$GREEN==> Installing bombuscv-rs...$NORM\n"
-  $HOME/.cargo/bin/cargo install --path ./motion-detector
+if [ $? = 0 ]; then
+  printf "$GREEN==> Installing rustymode...$NORM\n"
+  $HOME/.cargo/bin/cargo install --path $HOME/rustymode
 else
   exit_msg "unable to install rustup, please retry"
 fi

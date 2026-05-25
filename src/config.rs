@@ -94,16 +94,6 @@ fn default_overlay_border() -> u8 {
     3
 }
 
-/// Default value for Slack Channel.
-fn default_slack_channel() -> String  {
-    "#cam".to_string()
-}
-
-/// Default value for Slack User.
-fn default_slack_user() -> String  {
-    "detector".to_string()
-}
-
 /// Default value for streamer listener
 fn default_streamer_listener() -> String {
     "0.0.0.0:8740".to_string()
@@ -161,21 +151,21 @@ pub struct Config {
     #[serde(skip_deserializing, default)]
     pub no_color: bool,
 
+    /// Motion detector sensitivity
+    #[serde(default)]
+    pub sensitivity: f64,
+
     /// Mute standard output.
     #[serde(default)]
     pub quiet: bool,
 
-    /// Slack wbehook url.
+    /// Slack channel id.
     #[serde(default)]
-    pub slack_url: String,
+    pub slack_channel_id: String,
 
-    /// Slack channel.
+    /// Slack token.
     #[serde(default)]
-    pub slack_channel: String,
-
-    /// Slack username.
-    #[serde(default)]
-    pub slack_user: String,
+    pub slack_token: String,
 
     /// Streamer listening apddress
     #[serde(default)]
@@ -202,11 +192,11 @@ impl Default for Config {
             overlay_border: default_overlay_border(),
             no_color: false,
             quiet: false,
-            slack_url: "".to_string(),
-            slack_channel: default_slack_channel(),
-            slack_user: default_slack_user(),
+            slack_channel_id: "".to_string(), 
+            slack_token: "".to_string(),
             streamer_image_encode: default_streamer_encode_image(),
             streamer_listener: default_streamer_listener(),
+            sensitivity: 10000.0,
         }
     }
 }

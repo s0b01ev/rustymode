@@ -20,48 +20,99 @@
 //!
 //! Motion Detection, Video Streaming and Alerting with Rust.
 
+use std::io::Cursor;
+use async_trait::async_trait;
+use slack_morphism::{
+    prelude::*
+};
+use image::{ImageReader, ImageFormat};
 
-extern crate slack_hook;
-use slack_hook::{Slack, PayloadBuilder, Payload};
+use crate::{error::ErrorKind, ChatPayload, Messenger };
 
-use crate::{error::ErrorKind, Messenger};
+type SlackSession<'a> = SlackClientSession<'a, SlackClientHyperHttpsConnector>;
 
-pub struct SlackMessenger {
-    pub slack: Slack,
-    pub channel: String,
-    pub username: String,
-}
-pub fn new(slack_url: &str, slack_channel: &str, slack_user: &str) -> Result<SlackMessenger, ErrorKind> {
-   let slack = Slack::new(slack_url)
-       .map(|s| SlackMessenger{
-           slack: s,
-           channel: slack_channel.to_string(),
-           username: slack_user.to_string(),
-       });
-   match slack {
-        Ok(slack) => Ok(slack),
-        Err(e) => Err(ErrorKind::CreateSlackClientErr(e.to_string())),
-   }
+pub struct SlackCtx {
+    client: SlackClient<SlackClientHyperHttpsConnector>,
+    token: SlackApiToken,
+    pub channel: SlackChannelId,
 }
 
-impl Messenger for SlackMessenger {
-    fn send(&mut self, payload: Payload) -> Result<(), ErrorKind> {
-        let res = &self.slack.send(&payload);
-        match res {
-            Ok(_) => Ok(()),
-            Err(e) => Err(ErrorKind::UnableToSendSlackMessage(e.to_string())),
-        }
+impl SlackCtx {
+    pub fn new(channel: SlackChannelId, token: SlackApiToken) -> std::io::Result<Self> {
+        let connector = SlackClientHyperConnector::new()?;
+        let client = SlackClient::new(connector);
+
+        Ok(Self { client, token, channel })
     }
 
-   fn payload(&self, text: String) -> Result<Payload, ErrorKind> {
-        let payload = PayloadBuilder::new()
-            .text(text)
-            .channel(&self.channel)
-            .username(&self.username)
-            .build();
+    pub fn session(&self) -> SlackSession<'_> {
+        self.client.open_session(&self.token)
+    }
+}
+
+pub struct SlackMessenger {
+    ctx: SlackCtx,
+}
+
+impl SlackMessenger {
+    pub fn new(channel: SlackChannelId, token: SlackApiToken) -> std::io::Result<Self> {
+        Ok(Self {
+            ctx: SlackCtx::new(channel, token)?,
+        })
+    }
+}
+
+#[async_trait]
+impl Messenger for SlackMessenger {
+    async fn send(&self, payload: &ChatPayload) -> anyhow::Result<()> {
+        let session = self.ctx.session();
+
         match payload {
-            Ok(payload) => Ok(payload),
-            Err(_) => Err(ErrorKind::CreateSlackPayloadErr),
+            ChatPayload::Text { text } => {
+                let req =
+                    SlackApiChatPostMessageRequest::new(
+                        self.ctx.channel.clone(),
+                        SlackMessageContent::new().with_text(text.into())
+                    );
+                session.chat_post_message(&req).await?;
+            }
+
+            ChatPayload::TextWithEmoji { text, emoji } => {
+                let body = format!(":{}: {}", emoji, text);
+
+                let req =
+                    SlackApiChatPostMessageRequest::new(self.ctx.channel.clone(),
+                                                        SlackMessageContent::new().with_text(body.into())
+                    );
+
+                session.chat_post_message(&req).await?;
+            }
+
+            ChatPayload::Image { img } => {
+                let get_upload_url_req =
+                    SlackApiFilesGetUploadUrlExternalRequest::new("image.png".into(), img.len());
+                let upload_url_resp = session.get_upload_url_external(&get_upload_url_req).await?;
+
+                let file_upload_req = SlackApiFilesUploadViaUrlRequest::new(
+                    upload_url_resp.upload_url,
+                    (*img.clone()).to_owned(),
+                    "image/png".into(),
+                );
+
+                let file_upload_resp = session.files_upload_via_url(&file_upload_req).await?;
+
+                let complete_file_upload_req =
+                    SlackApiFilesCompleteUploadExternalRequest::new(vec![SlackApiFilesComplete::new(
+                        upload_url_resp.file_id,
+                    )])
+                        .with_channel_id("C06KDAZ3EBE".into());
+
+                let complete_file_upload_resp = session
+                    .files_complete_upload_external(&complete_file_upload_req)
+                    .await?;
+            }
         }
+
+        Ok(())
     }
 }

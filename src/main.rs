@@ -18,7 +18,7 @@
 #[cfg(test)]
 mod test;
 
-use rustymode::{args::{Args, Parser}, color::{Colorizer, MsgType}, config::Config, Codec, Grabber, MotionDetector, Writer, VideoStreamer, Messenger, slack, Frame};
+use rustymode::{args::{Args, Parser}, color::{Colorizer, MsgType}, config::Config, Codec, Grabber, MotionDetector, Writer, VideoStreamer, Messenger, slack, Frame, ChatPayload};
 use chrono::Local;
 use signal_hook::{consts::SIGINT, flag::register};
 use std::io;
@@ -31,13 +31,13 @@ use std::{
     },
     thread,
 };
-use std::io::Write;
-use std::net::TcpListener;
-use std::os::unix::raw::time_t;
+use std::io::{Write};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use opencv::core::{Mat, Vector};
+use opencv::core::{Vector};
 use opencv::imgcodecs;
-use opencv::videoio::{CAP_ANY, VideoCapture, VideoCaptureTrait};
+use slack_morphism::prelude::*;
+
+use crate::slack::SlackMessenger;
 
 fn main() -> io::Result<()> {
     // Parse CLI arguments.
@@ -121,7 +121,7 @@ fn main() -> io::Result<()> {
     }
 
     // Instance of the motion detector.
-    let detector = MotionDetector::new();
+    let detector = MotionDetector::new(config.sensitivity);
 
     // Instance of the frame writer.
     let writer = match Writer::new(
@@ -155,17 +155,10 @@ fn main() -> io::Result<()> {
         }
     };
 
-    let messenger = match slack::new(
-        config.slack_url.as_str(),
-        config.slack_channel.as_str(),
-        config.slack_user.as_str(),
-    ) {
-        Ok(messenger) => messenger,
-        Err(e) => {
-        Colorizer::new(MsgType::Error, config.no_color, "error", e).print()?;
-        process::exit(1);
-    }
-    };
+    // Messenger
+    let token_value: SlackApiTokenValue = config.slack_token.into();
+    let token: SlackApiToken = SlackApiToken::new(token_value);
+    let messenger = SlackMessenger::new("C06KDAZ3EBE".into(), token)?;
 
     // Save memory dropping `filename`.
     drop(filename);
@@ -186,8 +179,8 @@ fn run(
     mut grabber: Grabber,
     mut detector: MotionDetector,
     mut writer: Writer,
-    mut streamer: VideoStreamer,
-    mut messenger: Box<dyn Messenger + Send>,
+    streamer: VideoStreamer,
+    messenger: Box<dyn Messenger + Send>,
     no_color: bool,
 ) -> io::Result<()> {
     // Create channels for message passing between threads.
@@ -236,16 +229,14 @@ fn run(
                 }
             };
 
-
-            let frame_clone = Frame{ frame: frame.frame.clone(), datetime: frame.datetime.clone() };
             // Grab frame and send it to the motion detection thread.
-            if raw_tx.send(frame).is_err() {
+            if raw_tx.send(frame.clone()).is_err() {
                 break;
             }
 
             if grabber_flag.load(Ordering::Relaxed) {
                 // Grab frame clone and send it to the video streamer thread.
-                if streamer_tx.send(frame_clone).is_err() {
+                if streamer_tx.send(frame.clone()).is_err() {
                     break;
                 }
             }
@@ -269,7 +260,7 @@ fn run(
                 Ok(val) => {
                     // Motion has been detected: send frame to the video writer.
                     if let Some(frame) = val {
-                        if proc_tx.send(frame).is_err() {
+                        if proc_tx.send(frame.clone()).is_err() {
                             Colorizer::new(
                                 MsgType::Warn,
                                 no_color,
@@ -278,8 +269,7 @@ fn run(
                             )
                             .print()?;
                         };
-                        // TODO: make it sending a frame with motion detected rather than just bool
-                        if dtr_tx.send(true).is_err() {
+                        if dtr_tx.send(frame).is_err() {
                             let time_now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
                             if time_now - message_last_sent > Duration::from_secs(10) {
                                 message_last_sent = time_now;
@@ -350,10 +340,12 @@ fn run(
                             return Ok(());
                         }
                         buf.clear();
-                        let _ = imgcodecs::imencode(".jpg", &frame.frame, &mut buf, &Vector::new());
+                        let _ = imgcodecs::imencode(&*streamer.imencode_ext, &frame.frame, &mut buf, &Vector::new());
 
+                        let imencode_ext_trim  = &*streamer.imencode_ext.trim_start_matches('.');
                         let image_data = format!(
-                            "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
+                            "--frame\r\nContent-Type: image/{}\r\nContent-Length: {}\r\n\r\n",
+                            imencode_ext_trim,
                             buf.len()
                         );
 
@@ -406,10 +398,13 @@ fn run(
     });
 
     // Spawn messenger thread:
-    // this thread receives a message from detector thread, if motion detected
+    // this thread receives a message from the detector thread, if motion detected
     let messenger_handle = thread::spawn(move || -> io::Result<()> {
         // Loop over received frames from the motion detector.
         for detected in msgr_rx {
+            let mut buf = Vector::new();
+            imgcodecs::imencode(".png", &detected.frame, &mut buf, &Vector::new())
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             if term_messenger.load(Ordering::Relaxed) {
                 println!("Exit 0 from messenger thread");
                 return Ok(());
@@ -419,13 +414,15 @@ fn run(
             if time_now - message_last_sent > Duration::from_secs(5) {
                 message_last_sent = time_now;
                 Colorizer::new(MsgType::Info, no_color, "==>", motion_detected_msg.clone()).print()?;
-                let payload = messenger.payload(motion_detected_msg.to_owned())
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-                let res = messenger.send(payload);
-                match res {
-                    Ok(()) => (),
-                    Err(x) => println!("ERR: {:?}",x)
-                }
+                let chat_message = ChatPayload::Text { text: motion_detected_msg.clone() };
+                let chat_payload = ChatPayload::Image { img: buf.into() };
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()?;
+                let res: anyhow::Result<()> = rt.block_on(messenger.send(&chat_message));
+                res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                let res: anyhow::Result<()> = rt.block_on(messenger.send(&chat_payload));
+                res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             }
         }
 

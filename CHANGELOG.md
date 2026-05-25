@@ -9,6 +9,9 @@ Updated
 ### Added
 
 - Configuration option to specify *Date&Time* overlay border.
+- HTTP streaming support.
+- Slack alerting support.
+- Detector sensitivity configuration option.
 
 ### Changed
 

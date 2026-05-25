@@ -30,25 +30,27 @@ pub mod slack;
 use crate::error::ErrorKind;
 use chrono::{DateTime, Local};
 use opencv::{
-    core::{absdiff, Point, Scalar, Size, Vector, BORDER_CONSTANT, BORDER_DEFAULT, CV_8UC3},
+    core::{
+        AlgorithmHint, BORDER_CONSTANT, BORDER_DEFAULT, CV_8UC3, Point, Scalar, Size, Vector,
+        absdiff,
+    },
+    highgui,
     imgproc::{
-        cvt_color, dilate, find_contours, gaussian_blur, morphology_default_border_value, put_text,
-        resize, threshold, LineTypes, CHAIN_APPROX_SIMPLE, COLOR_BGR2GRAY, FONT_HERSHEY_DUPLEX,
-        INTER_LINEAR, RETR_EXTERNAL, THRESH_BINARY,
+        CHAIN_APPROX_SIMPLE, COLOR_BGR2GRAY, FONT_HERSHEY_DUPLEX, INTER_LINEAR, LineTypes,
+        RETR_EXTERNAL, THRESH_BINARY, cvt_color, dilate, find_contours, gaussian_blur,
+        morphology_default_border_value, put_text, resize, threshold,
     },
     prelude::{Mat, MatTraitConst},
     videoio::{
+        CAP_ANY, CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L2,
         VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst, VideoWriter, VideoWriterTrait,
-        CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, CAP_V4L2, CAP_ANY,
     },
-    highgui,
 };
 
-use std::{os::raw::c_char, path::Path};
-use std::io;
-use std::net::{SocketAddr, TcpListener};
-use slack_hook::{Payload, PayloadBuilder, Slack};
-use url::Url;
+use async_trait::async_trait;
+use opencv::imgproc::contour_area;
+use std::net::TcpListener;
+use std::path::Path;
 
 /// Video codecs.
 #[derive(Debug)]
@@ -64,18 +66,10 @@ impl Codec {
     fn fourcc(&self) -> i32 {
         // If no fourcc code can be obtained, video processing can't start, so it's fine to panic.
         match *self {
-            Codec::MJPG => {
-                VideoWriter::fourcc('M' as char, 'J' as char, 'P' as char, 'G' as char)
-            }
-            Codec::XVID => {
-                VideoWriter::fourcc('X' as char, 'V' as char, 'I' as char, 'D' as char)
-            }
-            Codec::MP4V => {
-                VideoWriter::fourcc('m' as char, 'p' as char, '4' as char, 'v' as char)
-            }
-            Codec::H264 => {
-                VideoWriter::fourcc('h' as char, '2' as char, '6' as char, '4' as char)
-            }
+            Codec::MJPG => VideoWriter::fourcc('M' as char, 'J' as char, 'P' as char, 'G' as char),
+            Codec::XVID => VideoWriter::fourcc('X' as char, 'V' as char, 'I' as char, 'D' as char),
+            Codec::MP4V => VideoWriter::fourcc('m' as char, 'p' as char, '4' as char, 'v' as char),
+            Codec::H264 => VideoWriter::fourcc('h' as char, '2' as char, '6' as char, '4' as char),
         }
         .unwrap_or_else(|_| panic!("unable to generate {:?} fourcc code", self))
     }
@@ -86,7 +80,7 @@ impl Codec {
 /// # Fields
 /// * frame: the video frame itself
 /// * datetime: DateTime object representing the instant
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub frame: Mat,
     pub datetime: DateTime<Local>,
@@ -128,7 +122,7 @@ impl Grabber {
 
         // Construct the VideoCapture object.
         match VideoCapture::new_with_params(index, CAP_ANY, &params) {
-        //match VideoCapture::new_with_params(index, CAP_V4L2, &params) {
+            //match VideoCapture::new_with_params(index, CAP_V4L2, &params) {
             Ok(cap) => Ok(Self { cap }),
             Err(_) => Err(ErrorKind::InvalidCameraIndex),
         }
@@ -185,7 +179,6 @@ impl Grabber {
             Err(ErrorKind::FrameDropped)
         }
     }
-
 }
 
 /// Implement Drop trait for the Grabber struct to release the VideoCapture on Grabber drop.
@@ -202,22 +195,24 @@ impl Drop for Grabber {
 #[derive(Debug)]
 pub struct MotionDetector {
     prev_frame: Mat,
+    sensitivity: f64,
 }
 
 impl Default for MotionDetector {
     fn default() -> Self {
-        Self::new()
+        Self::new(10000.0)
     }
 }
 
 impl MotionDetector {
     /// Create an instance of the MotionDetector.
-    pub fn new() -> Self {
+    pub fn new(sensitivity: f64) -> Self {
         Self {
             // Initialize prev_frame as 640x480 empty frame: next grabbed frames will be
             // downscaled to this resolution and this initialization must be a valid Size for the
             // first frame comparison.
             prev_frame: unsafe { Mat::new_size(Size::new(640, 480), CV_8UC3).unwrap() },
+            sensitivity,
         }
     }
 
@@ -268,6 +263,7 @@ impl MotionDetector {
             &mut frame_two,
             COLOR_BGR2GRAY, // Color space conversion code (see #ColorConversionCodes).
             0, // Number of channels in the destination image; if the parameter is 0, the number of the channels is derived automatically from src and code.
+            opencv::core::AlgorithmHint::ALGO_HINT_DEFAULT,
         )
         .expect("cvt_color failed");
 
@@ -279,6 +275,7 @@ impl MotionDetector {
             21.,             // Gaussian kernel standard deviation in x direction.
             21.,             // Gaussian kernel standard deviation in y direction.
             BORDER_DEFAULT,
+            opencv::core::AlgorithmHint::ALGO_HINT_DEFAULT,
         )
         .expect("gaussian_blur failed");
 
@@ -319,9 +316,25 @@ impl MotionDetector {
             // No motion was detected.
             true => None,
             // Motion was found, return original video frame.
-            false => Some(frame),
+            false => {
+                if max_contours_area(contours) > self.sensitivity {
+                    Some(frame)
+                } else {
+                    None
+                }
+            }
         })
     }
+}
+
+fn max_contours_area(contours: Vector<Vector<Point>>) -> f64 {
+    let mut max_area = 0f64;
+    contours.iter().for_each(|contour| {
+        if let Ok(area) = contour_area(&contour, false) {
+            max_area = max_area.max(area);
+        }
+    });
+    max_area
 }
 
 /// Video frame writer.
@@ -364,7 +377,7 @@ impl Writer {
         }
     }
 
-    /// Write passed frame to the video file.
+    /// Write the passed frame to the video file.
     pub fn write(&mut self, mut frame: Frame) -> Result<(), ErrorKind> {
         // Add date&time overlay.
         if self.overlay {
@@ -376,7 +389,7 @@ impl Writer {
                 FONT_HERSHEY_DUPLEX, // Font type, see #hersheyfonts.
                 1., // Font scale factor that is multiplied by the font-specific base size.
                 Scalar::new(0., 0., 0., 1.), // Text color.
-                (2 + self.overlay_border).into(),  // Thickness.
+                (2 + self.overlay_border).into(), // Thickness.
                 LineTypes::LINE_8 as i32, // Linetype.
                 // true -> image data origin bottom-left corner
                 // false -> top-left corner.
@@ -430,7 +443,7 @@ impl Drop for Writer {
 pub struct VideoStreamer {
     // pub grabber: Grabber,
     pub listener: TcpListener,
-    imencode_ext: String,
+    pub imencode_ext: String,
 }
 
 impl VideoStreamer {
@@ -448,7 +461,14 @@ impl VideoStreamer {
     ///
     /// Wherever the requested video capture parameters (height, width, fps) are not available for
     /// the given video capture device, OpenCV selects the closest available values.
-    pub fn new(index: i32, height: i32, width: i32, fps: i32, listener_addr: &str, encode_image_type: &str) -> Result<Self, ErrorKind> {
+    pub fn new(
+        index: i32,
+        height: i32,
+        width: i32,
+        fps: i32,
+        listener_addr: &str,
+        encode_image_type: &str,
+    ) -> Result<Self, ErrorKind> {
         // Generate Vector of VideoCapture parameters.
         let params = Vector::from_slice(&[
             CAP_PROP_FRAME_WIDTH,
@@ -461,21 +481,36 @@ impl VideoStreamer {
 
         match TcpListener::bind(listener_addr) {
             Ok(listener) => {
-                    //match VideoCapture::new_with_params(index, CAP_V4L2, &params) {
-                        Ok(Self {
-                            listener,
-                            imencode_ext: encode_image_type.to_string() })
-            },
+                //match VideoCapture::new_with_params(index, CAP_V4L2, &params) {
+                Ok(Self {
+                    listener,
+                    imencode_ext: encode_image_type.to_string(),
+                })
+            }
             Err(err) => Err(ErrorKind::CreateSocketError(err.to_string())),
         }
-
     }
-
 }
 
-/// Messanger
+/// Messenger
 ///
-pub trait Messenger {
-    fn send(&mut self, payload: Payload) -> Result<(), ErrorKind>;
-    fn payload(&self, text: String) -> Result<Payload, ErrorKind>;
+#[derive(Debug, Clone)]
+pub enum ChatPayload {
+    Text {
+        text: String,
+    },
+    TextWithEmoji {
+        text: String,
+        emoji: String,
+    },
+    Image {
+        // url: String,
+        // alt_text: Option<String>,
+        img: Vec<u8>,
+    },
+}
+
+#[async_trait]
+pub trait Messenger: Send + Sync {
+    async fn send(&self, payload: &ChatPayload) -> anyhow::Result<()>;
 }
